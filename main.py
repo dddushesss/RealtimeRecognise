@@ -1,15 +1,14 @@
-import os
 import sys
 
 import PyQt5
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from PyQt5 import QtGui
 from PyQt5.QtCore import Qt, QPoint, QDateTime
-from PyQt5.QtGui import QPainter, QImage
+from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import QMainWindow, QApplication
-import matplotlib.pyplot as plt
-from scipy.signal import argrelextrema, find_peaks
+from scipy.signal import find_peaks
 
 from mainWindow import Ui_MainWindow
 
@@ -23,6 +22,7 @@ class App(QMainWindow, Ui_MainWindow):
 
         self.ClearAction.triggered.connect(self.clear)
         self.writeToBaseButton.clicked.connect(self.writeToBase)
+
         self.brushSizeSlider.valueChanged.connect(self.setBrushSize)
         self.bordersButton.clicked.connect(self.drawBorders)
         self.setFixedSize(self.size())
@@ -35,6 +35,7 @@ class App(QMainWindow, Ui_MainWindow):
         self.brushColor = Qt.black
         self.lastPoint = QPoint()
         self.learnArray = []
+        self.data = []
 
     def drawBorders(self):
         borders = []
@@ -42,11 +43,21 @@ class App(QMainWindow, Ui_MainWindow):
         painter = PyQt5.QtGui.QPainter(self.image)
         painter.setPen(PyQt5.QtGui.QPen(self.brushColor, self.brushSize, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
         a = np.array(self.learnArray)
-        met = a[:,6]
-        plt.plot(met)
+        met = a[:, int(self.metricTextEdit.toPlainText())]
+        fig, ax = plt.subplots()
 
-        peaks, _ = find_peaks(met, height=100)
-        plt.plot(peaks, met[peaks], "x")
+        plt1, = ax.plot(a[:, 6], label='По расстоянию')
+        plt2, = ax.plot(a[:, 7], label='По времени')
+
+        peaks, _ = find_peaks(met, height=int(self.borderTextEdit.toPlainText()))
+        peaks1, _ = find_peaks(a[:, 6], height=int(self.borderTextEdit.toPlainText()))
+        peaks2, _ = find_peaks(a[:, 7], height=int(self.borderTextEdit.toPlainText()))
+
+        plt3, = ax.plot(peaks1, a[:, 6][peaks1], "x", label='Пики расстояний')
+        plt4, = ax.plot(peaks2, a[:, 7][peaks2], "*", label='Пики времени')
+
+        ax.legend(handles=[plt1, plt2, plt3, plt4])
+        plt.grid(True)
         plt.show()
         if len(peaks) > 0:
             res = self.learnArray[0:peaks[0]]
@@ -59,20 +70,23 @@ class App(QMainWindow, Ui_MainWindow):
             self.bordersAdd(borders, res)
         else:
             self.bordersAdd(borders, self.learnArray)
+
         print("**********")
         for j in range(0, len(borders)):
-            painter.drawRect(borders[j][1], borders[j][2], borders[j][3], borders[j][4])
+            painter.drawRect(int(borders[j][1]), int(borders[j][2]), int(borders[j][3]), int(borders[j][4]))
             print(borders[j][1], borders[j][2], borders[j][3], borders[j][4], sep=" ")
-        print("**********")
+            b = np.array(borders[j][0])
+            b[:, 4] = b[:, 4] - borders[j][1]
+            b[:, 5] = b[:, 5] - borders[j][2]
+            self.data.append([self.charTextEdit.toPlainText(), b[:, 4], b[:, 5], b[:, 6], b[:, 7]])
+
+        self.update()
 
     def bordersAdd(self, borders: list, res: list):
         borders.append([res, min(res, key=lambda e: e[4])[4],
                         min(res, key=lambda e: e[5])[5],
-                        max(res, key=lambda e: e[4])[4] - min(res,
-                                                              key=lambda e: e[4])[4],
-                        max(res, key=lambda e: e[5])[5] - min(res,
-                                                              key=lambda e: e[5])[5]
-                        ])
+                        max(res, key=lambda e: e[4])[4] - min(res, key=lambda e: e[4])[4],
+                        max(res, key=lambda e: e[5])[5] - min(res, key=lambda e: e[5])[5]])
 
     def resizeImage(self):
         self.image.rect().setSize(self.size())
@@ -94,7 +108,6 @@ class App(QMainWindow, Ui_MainWindow):
             self.lastPoint = event.pos()
 
             self.writeArray()
-            self.writeToBase()
             self.update()
 
     def mouseReleaseEvent(self, event):
@@ -129,8 +142,13 @@ class App(QMainWindow, Ui_MainWindow):
                  QDateTime.currentDateTime().time().second(), QDateTime.currentDateTime().time().msec(),
                  self.lastPoint.x().real,
                  self.lastPoint.y().real,
-                 0.])
+                 0., 0.])
         else:
+            t = self.learnArray[len(self.learnArray) - 1][0] * 10000000 + self.learnArray[len(self.learnArray) - 1][
+                1] * 100000 + self.learnArray[len(self.learnArray) - 1][
+                    2] * 1000 + self.learnArray[len(self.learnArray) - 1][3]
+            time = QDateTime.currentDateTime().time()
+            t1 = time.hour() * 10000000 + time.minute() * 100000 + time.second() * 1000 + time.msec()
             x = self.learnArray[len(self.learnArray) - 1][4]
             y = self.learnArray[len(self.learnArray) - 1][5]
             self.learnArray.append(
@@ -138,15 +156,20 @@ class App(QMainWindow, Ui_MainWindow):
                  QDateTime.currentDateTime().time().second(), QDateTime.currentDateTime().time().msec(),
                  self.lastPoint.x().real,
                  self.lastPoint.y().real,
-                 ((self.lastPoint.x() - x) ** 2 + (self.lastPoint.y() - y) ** 2) ** 0.5])
+                 ((self.lastPoint.x() - x) ** 2 + (self.lastPoint.y() - y) ** 2) ** 0.5, t1 - t])
 
     def writeToBase(self):
-        df = pd.DataFrame(self.learnArray)
-        df.to_csv('data.csv', index=False, header=False)
-        np.save("Data/" + self.fileNameTextEdit.toPlainText(), self.learnArray)
+        # df = pd.DataFrame(self.learnArray)
+        # df.to_csv('Data/data.csv', index=False, header=False)
+        file = pd.DataFrame(self.data, columns=['Char', 'x', 'y', 'distance', 'time'])
+        file.to_csv('Data/data.csv', mode='a', index=False, header=False,
+                    columns=['Char', 'x', 'y', 'distance', 'time'])
+        # self.data.tofile(f'Data/{self.charTextEdit.toPlainText()}')
 
     def clear(self):
         self.image.fill(Qt.white)
+        self.learnArray = []
+        self.data = []
         self.update()
 
 

@@ -84,12 +84,12 @@
      <string>Write</string>
     </property>
    </widget>
-   <widget class="QTextEdit" name="fileNameTextEdit">
+   <widget class="QTextEdit" name="metricTextEdit">
     <property name="geometry">
      <rect>
       <x>270</x>
       <y>10</y>
-      <width>151</width>
+      <width>31</width>
       <height>31</height>
      </rect>
     </property>
@@ -105,6 +105,26 @@
     </property>
     <property name="text">
      <string>Borders</string>
+    </property>
+   </widget>
+   <widget class="QTextEdit" name="borderTextEdit">
+    <property name="geometry">
+     <rect>
+      <x>310</x>
+      <y>10</y>
+      <width>31</width>
+      <height>31</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QTextEdit" name="charTextEdit">
+    <property name="geometry">
+     <rect>
+      <x>350</x>
+      <y>10</y>
+      <width>81</width>
+      <height>31</height>
+     </rect>
     </property>
    </widget>
   </widget>
